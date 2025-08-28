@@ -71,15 +71,15 @@ class GCNLayer:
         self.dW = np.zeros_like(self.W)
 
     def forward(self, X, A_hat):
-        self.X = X
-        self.A_hat = A_hat
-        self.Z = A_hat @ X @ self.W
+
+
+
         return self.Z
 
     def backward(self, dZ, lr):
-        self.dW = self.X.T @ self.A_hat.T @ dZ
-        dX = self.A_hat @ dZ @ self.W.T
-        self.W -= lr * self.dW
+
+
+
         return dX
 
 class GCN:
@@ -88,19 +88,16 @@ class GCN:
         self.gcn2 = GCNLayer(hidden_dim, out_dim)
 
     def forward(self, X, A_hat):
-        self.Z1 = self.gcn1.forward(X, A_hat)
-        self.A1 = relu(self.Z1)
-        self.Z2 = self.gcn2.forward(self.A1, A_hat)
-        self.A2 = softmax(self.Z2)
+
+
+
         return self.A2
 
     def backward(self, X, A_hat, labels, lr):
-        m = X.shape[0]
-        Y = one_hot(labels, self.A2.shape[1])
-        dZ2 = (self.A2 - Y) / m
-        dA1 = self.gcn2.backward(dZ2, lr)
-        dZ1 = dA1 * relu_derivative(self.Z1)
-        _ = self.gcn1.backward(dZ1, lr)
+
+
+
+
 
 # ---------------------------
 # Visualization functions
