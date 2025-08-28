@@ -31,13 +31,16 @@ class Conv2D:
         self.biases = np.zeros((num_filters, 1))
 
     def forward(self, X):
-
-        '''
-
-        CREATE YOUR OWN FORWARD FUNCTION
-
-        '''
-
+        self.X = X
+        batch_size, depth, h, w = X.shape
+        out_h = h - self.filter_size + 1
+        out_w = w - self.filter_size + 1
+        self.out = np.zeros((batch_size, self.num_filters, out_h, out_w))
+        for i in range(out_h):
+            for j in range(out_w):
+                region = X[:, :, i:i+self.filter_size, j:j+self.filter_size]
+                for f in range(self.num_filters):
+                    self.out[:, f, i, j] = np.sum(region * self.filters[f], axis=(1,2,3)) + self.biases[f]
         return self.out
 
     def backward(self, d_out, lr=0.01):
@@ -67,13 +70,17 @@ class MaxPool2D:
         self.size = size
 
     def forward(self, X):
-
-        '''
-
-        CREATE YOUR OWN FORWARD FUNCTION
-
-        '''
-
+        self.X = X
+        batch, depth, h, w = X.shape
+        out_h, out_w = h // self.size, w // self.size
+        self.out = np.zeros((batch, depth, out_h, out_w))
+        self.mask = np.zeros_like(X)
+        for i in range(out_h):
+            for j in range(out_w):
+                region = X[:, :, i*self.size:(i+1)*self.size, j*self.size:(j+1)*self.size]
+                max_vals = np.max(region, axis=(2,3), keepdims=True)
+                self.out[:, :, i, j] = max_vals.squeeze()
+                self.mask[:, :, i*self.size:(i+1)*self.size, j*self.size:(j+1)*self.size] = (region == max_vals)
         return self.out
 
     def backward(self, d_out):
@@ -95,13 +102,7 @@ class Dense:
         self.b = np.zeros((1, output_dim))
 
     def forward(self, X):
-
-        '''
-
-        CREATE YOUR OWN FORWARD FUNCTION
-
-        '''
-
+        self.X = X
         return X @ self.W + self.b
 
     def backward(self, d_out, lr=0.01):
@@ -160,17 +161,19 @@ for epoch in range(epochs):
         y_batch = train_y_onehot[start:end]
         y_labels = train_y[start:end]
 
-        '''
-
-        CREATE YOUR OWN FORWARD AND LOSS DESCRIPTIONS
-
-        '''
-
         # Forward
-
+        out = conv.forward(X_batch)
+        out = relu(out)
+        out = pool.forward(out)
+        out_flat = out.reshape(len(X_batch), -1)
+        logits = fc.forward(out_flat)
+        probs = softmax(logits)
 
         # Loss & Accuracy
-
+        loss = -np.mean(np.sum(y_batch * np.log(probs + 1e-9), axis=1))
+        losses.append(loss)
+        acc = np.mean(np.argmax(probs, axis=1) == y_labels)
+        accuracies.append(acc)
 
         # Backward
         d_logits = (probs - y_batch) / len(X_batch)
