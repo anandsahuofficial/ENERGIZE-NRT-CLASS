@@ -5,10 +5,11 @@ channels:
 dependencies:
   - python=3.10
   - pymatgen
-  - ase
+  - ase=3.23
   - scikit-learn
   - jupyterhub
   - notebook
   - mp-api
   - ipympl
-prefix: C:\Users\jc112358\AppData\Local\anaconda3\envs\ME_508
+  - dscribe
+  - tensorflow
