@@ -14,10 +14,6 @@ from ase.io import read
 from mp_api.client import MPRester
 from ase import Atoms
 
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-
 # -------------------
 # User settings
 # -------------------
