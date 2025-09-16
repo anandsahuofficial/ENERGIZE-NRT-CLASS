@@ -83,12 +83,12 @@ class SyntheticEBSDDataset(Dataset):
 class DoubleConv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
-        self.seq = nn.Sequential(
-            nn.Conv2d(in_ch, out_ch, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(out_ch, out_ch, 3, padding=1),
-            nn.ReLU(inplace=True)
-        )
+
+    '''
+    
+    TO-DO
+
+    '''
 
     def forward(self, x):
         return self.seq(x)
@@ -110,17 +110,11 @@ class UNet(nn.Module):
         self.pool = nn.MaxPool2d(2)
 
     def forward(self, x):
+        '''
+    
+        TO-DO
 
         '''
-
-
-        Define your own forward function
-
-
-        '''
-
-
-
         return x
 
 
@@ -130,21 +124,36 @@ class UNet(nn.Module):
 def train_model(model, train_loader, val_loader, device, epochs=20, lr=1e-3):
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     for ep in range(epochs):
+        '''
+    
+        TO-DO
 
         '''
-        
-        Build your own training loop
-        
-        '''
-
-
-
-        vl = 0
-        with torch.no_grad():
-            for xb, yb, _ in val_loader:
-                xb, yb = xb.to(device), yb.to(device)
-                vl += F.binary_cross_entropy_with_logits(model(xb), yb).item()
         print(f"Epoch {ep + 1}: train {tr_loss / len(train_loader):.4f}, val {vl / len(val_loader):.4f}")
+
+
+# -----------------------------
+# Watershed Post-processing
+# -----------------------------
+def watershed_postprocess(prob_mask, thresh=0.075):
+    """
+    Postprocess CNN probability map into grain segments using watershed.
+    - prob_mask: 2D numpy array, CNN boundary probability [0,1]
+    - thresh: threshold for defining grain interior (default 0.5)
+    """
+    # Grains are the opposite of the boundary probability
+    grain_mask = prob_mask < thresh  
+
+    # Distance transform inside grains
+    distance = distance_transform_edt(grain_mask)
+
+    # Find local maxima inside grains for watershed seeds
+    local_maxi = morphology.local_maxima(distance)
+    markers = measure.label(local_maxi)
+
+    # Apply watershed segmentation
+    labeled = watershed(-distance, markers, mask=grain_mask)
+    return labeled
 
 
 # -----------------------------
@@ -152,19 +161,13 @@ def train_model(model, train_loader, val_loader, device, epochs=20, lr=1e-3):
 # -----------------------------
 def predict_and_plot(model, dataloader, device, out_dir, brighten=2.0):
     """
-    Plot CNN probability map vs ground truth labels.
-
-    Parameters:
-    - model: trained CNN
-    - dataloader: validation/test loader
-    - device: torch device
-    - out_dir: directory to save images
-    - brighten: factor to brighten probability map for visualization
+    Plot CNN probability map vs ground truth labels vs watershed segmented + labeled grains.
     """
     model.eval()
+    os.makedirs(out_dir, exist_ok=True)
+
     with torch.no_grad():
         for idx, data in enumerate(dataloader):
-            # Handle dataloader returning tensor or tuple
             if isinstance(data, (list, tuple)):
                 images, labels = data[:2]
             else:
@@ -177,18 +180,21 @@ def predict_and_plot(model, dataloader, device, out_dir, brighten=2.0):
 
             for i in range(probs_batch.shape[0]):
                 probs = probs_batch[i]
-
-                # Brighten for visualization
                 bright_probs = np.clip(probs * brighten, 0, 1)
 
-                fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+                # --- Watershed segmentation ---
+                labeled_grains = watershed_postprocess(probs)
+                props = measure.regionprops(labeled_grains)
 
-                # CNN probability map
+                # --- Create figure with 3 subplots ---
+                fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+                # 1) CNN probability map
                 axes[0].imshow(bright_probs, cmap='gray')
                 axes[0].set_title("CNN Probability Map")
                 axes[0].axis('off')
 
-                # Ground truth labels
+                # 2) Ground truth labels
                 if labels is not None:
                     label_img = labels[i].cpu().numpy()
                     if label_img.ndim == 3 and label_img.shape[0] == 1:
@@ -197,10 +203,26 @@ def predict_and_plot(model, dataloader, device, out_dir, brighten=2.0):
                     axes[1].set_title("Ground Truth")
                 axes[1].axis('off')
 
+                # 3) Watershed segmented grains with labels
+                axes[2].imshow(labeled_grains, cmap='nipy_spectral')
+                axes[2].set_title(f"Watershed Grains (count={len(props)})")
+                axes[2].axis('off')
+
+                 # Add red numbers at grain centroids
+                for prop in props:
+                    y, x = prop.centroid
+                    axes[2].text(x, y, str(prop.label), color='red',
+                                 ha='center', va='center', fontsize=8)
+
+                # Add red labels at grain centroids
+                for prop in props:
+                    y, x = prop.centroid
+                    axes[2].text(x, y, str(prop.label), color='red', ha='center', va='center', fontsize=8)
+
                 plt.tight_layout()
                 out_path = f"{out_dir}/compare_{idx}_{i}.png"
+                plt.savefig(out_path, dpi=150)
                 plt.show()
-
 
 # -----------------------------
 # Main
@@ -209,7 +231,7 @@ def main():
     class Args:
         synthetic = 50
         size = 128
-        epochs = 10
+        epochs = 50
         batch = 4
         out_dir = "./results"
 
