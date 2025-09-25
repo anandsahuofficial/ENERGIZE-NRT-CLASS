@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+"""
+Synthetic EBSD-like microstructure pipeline with watershed post-processing:
+- Generate N synthetic EBSD maps (Voronoi tessellation).
+- Train/test a U-Net on grain boundary segmentation.
+- Apply watershed to separate predicted grains.
+- Plot ground truth vs predicted grain labels side by side.
+"""
+
+import os, random, sys
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.ndimage import distance_transform_edt
+from scipy.spatial import Voronoi
+from skimage import morphology, measure
+from skimage.segmentation import watershed
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader, random_split
+
+
+# -----------------------------
+# Synthetic Data Generator
+# -----------------------------
+def generate_voronoi_grains(size=128, n_grains=30, seed=None):
+    if seed: np.random.seed(seed)
+    pts = np.random.rand(n_grains, 2) * size
+    xv, yv = np.meshgrid(np.arange(size), np.arange(size))
+    coords = np.stack([xv.ravel(), yv.ravel()], axis=-1)
+
+    dists = ((coords[:, None, :] - pts[None, :, :]) ** 2).sum(-1)
+    labels = dists.argmin(axis=1).reshape(size, size)
+
+    orientations = np.random.rand(n_grains, 3) * 2 * np.pi
+    euler_map = orientations[labels]
+
+    return labels, euler_map
+
+
+def generate_synthetic_dataset(n_samples=20, size=128, out_dir="./synthetic_data"):
+    os.makedirs(out_dir, exist_ok=True)
+    for i in range(n_samples):
+        labels, euler = generate_voronoi_grains(size=size, n_grains=random.randint(10, 40))
+        boundary = np.zeros_like(labels, dtype=np.uint8)
+        boundary[:-1, :] |= (labels[:-1, :] != labels[1:, :])
+        boundary[:, :-1] |= (labels[:, :-1] != labels[:, 1:])
+
+        sample_dir = os.path.join(out_dir, f"sample_{i:03d}")
+        os.makedirs(sample_dir, exist_ok=True)
+        np.save(os.path.join(sample_dir, "grain_ids.npy"), labels)
+        np.save(os.path.join(sample_dir, "ebsd_euler.npy"), euler)
+        np.save(os.path.join(sample_dir, "boundary_mask.npy"), boundary)
+
+
+# -----------------------------
+# Dataset
+# -----------------------------
+class SyntheticEBSDDataset(Dataset):
+    def __init__(self, root_dir):
+        self.samples = []
+        for s in sorted(os.listdir(root_dir)):
+            sd = os.path.join(root_dir, s)
+            if os.path.isdir(sd):
+                self.samples.append(sd)
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        sd = self.samples[idx]
+        euler = np.load(os.path.join(sd, "ebsd_euler.npy"))
+        boundary = np.load(os.path.join(sd, "boundary_mask.npy"))
+        euler = torch.from_numpy(euler).permute(2, 0, 1).float() / np.pi
+        boundary = torch.from_numpy(boundary).unsqueeze(0).float()
+        return euler, boundary, sd
+
+
+# -----------------------------
+# Model (U-Net)
+# -----------------------------
+class DoubleConv(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super().__init__()
+        self.seq = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, 3, padding=1),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.seq(x)
+
+
+class UNet(nn.Module):
+    def __init__(self, in_ch=3, out_ch=1):
+        super().__init__()
+        self.d1 = DoubleConv(in_ch, 32)
+        self.d2 = DoubleConv(32, 64)
+        self.d3 = DoubleConv(64, 128)
+
+        self.u1 = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.u2 = nn.ConvTranspose2d(64, 32, 2, stride=2)
+
+        self.d2_up = DoubleConv(128, 64)
+        self.d1_up = DoubleConv(64, 32)
+        self.outc = nn.Conv2d(32, out_ch, 1)
+        self.pool = nn.MaxPool2d(2)
+
+    def forward(self, x):
+        x1 = self.d1(x)
+        x2 = self.d2(self.pool(x1))
+        x3 = self.d3(self.pool(x2))
+
+        x = self.u1(x3)
+        x = torch.cat([x, x2], dim=1)
+        x = self.d2_up(x)
+
+        x = self.u2(x)
+        x = torch.cat([x, x1], dim=1)
+        x = self.d1_up(x)
+
+        x = self.outc(x)
+        return x
+
+
+# -----------------------------
+# Training
+# -----------------------------
+def train_model(model, train_loader, val_loader, device, epochs=20, lr=1e-3):
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    for ep in range(epochs):
+        model.train();
+        tr_loss = 0
+        for xb, yb, _ in train_loader:
+            xb, yb = xb.to(device), yb.to(device)
+            opt.zero_grad()
+            out = model(xb)
+            loss = F.binary_cross_entropy_with_logits(out, yb)
+            loss.backward();
+            opt.step()
+            tr_loss += loss.item()
+        model.eval();
+        vl = 0
+        with torch.no_grad():
+            for xb, yb, _ in val_loader:
+                xb, yb = xb.to(device), yb.to(device)
+                vl += F.binary_cross_entropy_with_logits(model(xb), yb).item()
+        print(f"Epoch {ep + 1}: train {tr_loss / len(train_loader):.4f}, val {vl / len(val_loader):.4f}")
+
+
+# -----------------------------
+# Watershed Post-processing
+# -----------------------------
+def watershed_postprocess(prob_mask):
+    mask = prob_mask ** 2 > 0.001
+    distance = distance_transform_edt(mask)
+    local_maxi = morphology.local_maxima(distance)
+    markers = measure.label(local_maxi)
+    labeled = watershed(-distance, markers, mask=mask)  # <- use skimage.segmentation.watershed
+    return labeled
+
+
+# -----------------------------
+# Postprocess & Visualization
+# -----------------------------
+def predict_and_plot(model, dataloader, device, out_dir, brighten=2.0):
+    """
+    Plot CNN probability map vs ground truth labels.
+
+    Parameters:
+    - model: trained CNN
+    - dataloader: validation/test loader
+    - device: torch device
+    - out_dir: directory to save images
+    - brighten: factor to brighten probability map for visualization
+    """
+    model.eval()
+    with torch.no_grad():
+        for idx, data in enumerate(dataloader):
+            # Handle dataloader returning tensor or tuple
+            if isinstance(data, (list, tuple)):
+                images, labels = data[:2]
+            else:
+                images = data
+                labels = None
+
+            images = images.to(device)
+            outputs = model(images)
+            probs_batch = torch.sigmoid(outputs).squeeze(1).cpu().numpy()  # [B,H,W]
+
+            for i in range(probs_batch.shape[0]):
+                probs = probs_batch[i]
+
+                # Brighten for visualization
+                bright_probs = np.clip(probs * brighten, 0, 1)
+
+                fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+                # CNN probability map
+                axes[0].imshow(bright_probs, cmap='gray')
+                axes[0].set_title("CNN Probability Map")
+                axes[0].axis('off')
+
+                # Ground truth labels
+                if labels is not None:
+                    label_img = labels[i].cpu().numpy()
+                    if label_img.ndim == 3 and label_img.shape[0] == 1:
+                        label_img = label_img.squeeze(0)
+                    axes[1].imshow(label_img, cmap='tab20')
+                    axes[1].set_title("Ground Truth")
+                axes[1].axis('off')
+
+                plt.tight_layout()
+                out_path = f"{out_dir}/compare_{idx}_{i}.png"
+                plt.show()
+
+
+# -----------------------------
+# Main
+# -----------------------------
+def main():
+    class Args:
+        synthetic = 50
+        size = 128
+        epochs = 10
+        batch = 4
+        out_dir = "./results"
+
+    if "ipykernel" in sys.modules:
+        args = Args()
+    else:
+        import argparse
+        ap = argparse.ArgumentParser()
+        ap.add_argument("--synthetic", type=int, default=20)
+        ap.add_argument("--size", type=int, default=128)
+        ap.add_argument("--epochs", type=int, default=20)
+        ap.add_argument("--batch", type=int, default=4)
+        ap.add_argument("--out_dir", type=str, default="./results")
+        args = ap.parse_args()
+
+    data_dir = os.path.join(args.out_dir, "synthetic_data")
+    generate_synthetic_dataset(args.synthetic, size=args.size, out_dir=data_dir)
+
+    ds = SyntheticEBSDDataset(data_dir)
+    n_train = int(0.8 * len(ds))
+    n_val = len(ds) - n_train
+    train_ds, val_ds = random_split(ds, [n_train, n_val])
+    train_loader = DataLoader(train_ds, batch_size=args.batch, shuffle=True)
+    val_loader = DataLoader(val_ds, batch_size=1)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = UNet(in_ch=3, out_ch=1).to(device)
+
+    train_model(model, train_loader, val_loader, device, epochs=args.epochs)
+    predict_and_plot(model, val_loader, device, args.out_dir, brighten=5.0)
+
+
+if __name__ == "__main__":
+    main()
