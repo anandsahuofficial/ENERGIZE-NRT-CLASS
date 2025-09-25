@@ -83,12 +83,22 @@ class SyntheticEBSDDataset(Dataset):
 class DoubleConv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
+        self.seq = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, 3, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, 3, padding=1),
+            nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True)
+        )
 
-    '''
-    
-    TO-DO
 
-    '''
+        '''
+        
+        TO-DO
+
+        '''
+
 
     def forward(self, x):
         return self.seq(x)
@@ -110,11 +120,24 @@ class UNet(nn.Module):
         self.pool = nn.MaxPool2d(2)
 
     def forward(self, x):
+        
+        
         '''
     
         TO-DO
 
         '''
+        x1 = self.d1(x)
+        x2 = self.d2(self.pool(x1))
+        x3 = self.d3(self.pool(x2))
+        x = self.u1(x3)
+        x = torch.cat([x, x2], dim=1)
+        x = self.d2_up(x)
+        x = self.u2(x)
+        x = torch.cat([x, x1], dim=1)
+        x = self.d1_up(x)
+        x = self.outc(x)
+    
         return x
 
 
@@ -129,6 +152,25 @@ def train_model(model, train_loader, val_loader, device, epochs=20, lr=1e-3):
         TO-DO
 
         '''
+        model.train()
+        tr_loss = 0.0
+        for images, labels, _ in train_loader:
+            images, labels = images.to(device), labels.to(device)
+            opt.zero_grad()
+            outputs = model(images)
+            loss = F.binary_cross_entropy_with_logits(outputs, labels)
+            loss.backward()
+            opt.step()
+            tr_loss += loss.item()
+        model.eval()
+        vl = 0.0
+        with torch.no_grad():
+            for images, labels, _ in val_loader:
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                loss = F.binary_cross_entropy_with_logits(outputs, labels)
+                vl += loss.item()
+
         print(f"Epoch {ep + 1}: train {tr_loss / len(train_loader):.4f}, val {vl / len(val_loader):.4f}")
 
 

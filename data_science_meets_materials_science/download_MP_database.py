@@ -9,7 +9,7 @@ from mp_api.client import MPRester
 # ----------------------------
 # CONFIG
 # ----------------------------
-API_KEY = "YkfSuI6Em4JWu1DPx46brfuusaYVR06X"   # <-- insert your Materials Project API key
+API_KEY = "T7DRymvlnF71Y4kdxKKvWeOTRvLZjAmg"   # <-- insert your Materials Project API key
 OUT_DIR = "mp_structures"
 CSV_PATH = "mp_metadata.csv"
 CHUNK_SIZE = 1000  # number of results per API request
