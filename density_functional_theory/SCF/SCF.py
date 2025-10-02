@@ -43,21 +43,34 @@ def scf_loop(N, dx, V, max_iter=100, tol=1e-8):
     '''
     STUDENT PORTION
     '''
+    psi_new = psi.copy()
+    energy = 0.0
+    delta_energy = np.inf
+    delta_psi = np.inf
 
     for iteration in range(max_iter):
         # Hamiltonian = kinetic + potential
-
-
+        H = T + np.diag(V)
         # Solve eigenvalue problem (calculate energy and new wavefunctions)
+        energies, wavefunctions = eigh(H)
+        energy = energies[0]
+        psi_new = wavefunctions[:, 0]
+        psi_new /= np.linalg.norm(psi_new)
 
+        # Compute changes for convergence
+        delta_energy = np.abs(energy - energy_old)
+        delta_psi = np.linalg.norm(psi_new - psi)
+        energy_old = energy
+        psi = psi_new.copy()
 
         # print convergence info
         # Commented out for clean output, but you can enable if you want
         # print(f"Iter {iteration+1}: Energy = {energy:.6f}, deltaE = {delta_energy:.2e}, deltaPsi = {delta_psi:.2e}")
 
+
         # check for convergence
-
-
+        if delta_energy < tol and delta_psi < tol:
+            break
     return psi_init, psi_new, energy
 
 def main():
@@ -101,6 +114,7 @@ def main():
 
     plt.suptitle('SCF Wavefunctions and Potentials for Different Potentials', fontsize=16)
     plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.savefig('scf_wavefunctions_potentials.png', dpi=300)
     plt.show()
 
 if __name__ == "__main__":

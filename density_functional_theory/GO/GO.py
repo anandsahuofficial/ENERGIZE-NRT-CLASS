@@ -122,11 +122,10 @@ def geometry_optimization(particles_init, x_grid, y_grid, kinetic_op,
         '''
         STUDENT PORTION
         '''
-
-
-
-        
-
+        energy, forces, psi = energy_and_forces(particles, x_grid, y_grid, kinetic_op, k_pot, r0, dx, dy)
+        energies.append(energy)
+        total_force = np.sum(np.linalg.norm(forces, axis=1))
+        forces_norm.append(total_force)
         # Clip forces to max norm 1.0
         max_force_norm = 1.0
         for i in range(len(forces)):
@@ -138,7 +137,9 @@ def geometry_optimization(particles_init, x_grid, y_grid, kinetic_op,
         '''
         STUDENT PORTION
         '''
-
+        if total_force < tol:
+            print(f"Converged after {step} steps with total force {total_force:.6f}")
+            break
 
 
 
@@ -149,6 +150,8 @@ def geometry_optimization(particles_init, x_grid, y_grid, kinetic_op,
         '''
         STUDENT PORTION
         '''
+        particles += step_size * forces
+        
 
 
 

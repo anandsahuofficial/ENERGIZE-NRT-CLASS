@@ -152,8 +152,9 @@ def geometry_optimization(particles_init, x_grid, y_grid, kinetic_op,
         forces_norm.append(total_force)
 
         print(f"Step {step + 1}: Energy = {energy:.6f}, Sum force = {total_force:.6f}",
-              f" bond length: {np.linalg.norm(particles[0] - particles[1]):.4f}")
+              f" bond length: {np.linalg.norm(particles[0] - particles[1]):.4f}", f" tol: {tol:.6f}")
 
+        
         if total_force < tol:
             print("Converged geometry optimization!")
             break
@@ -191,7 +192,7 @@ def main():
     particles_opt, energies, forces_norm, positions, psi = geometry_optimization(
         particles_init, x_grid, y_grid, kinetic_op,
         k_pot, r0, dx, dy,
-        max_steps=300, tol=1e-3, step_size=0.005)
+        max_steps=300, tol=1e-2, step_size=0.005)
 
     print("Optimized dimer positions:\n", particles_opt)
     print(f"Optimized bond length: {np.linalg.norm(particles_opt[1] - particles_opt[0]):.4f}")
