@@ -96,6 +96,7 @@ def velocity_verlet_nose_hoover_corrected(positions, velocities, box_size, D, a,
         TO-DO
         
         '''
+        e_therm = 0.5 * Q * xi**2 + dof * T_target * eta
 
         # extended (conserved) energy (e_ext)
         '''
@@ -105,6 +106,7 @@ def velocity_verlet_nose_hoover_corrected(positions, velocities, box_size, D, a,
         
         
         '''
+        e_ext = ke + pe + e_therm
 
         energies[step] = [ke, pe, ke + pe, e_therm, e_ext]
 

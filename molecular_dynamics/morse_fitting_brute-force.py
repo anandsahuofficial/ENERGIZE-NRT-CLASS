@@ -27,8 +27,22 @@ TO-DO
 
 
 '''
+D_values = np.linspace(0.5, 5.0, 50)    # Depth of the well
+a_values = np.linspace(0.5, 3.0, 50)    # Width of the well
+re_values = np.linspace(1.0, 3.0, 50)   # Equilibrium bond distance
 
+best_error = float('inf')
+best_params = None
 
+for D in D_values:
+    for a in a_values:
+        for re in re_values:
+            energies = morse(distances, D, a, re)
+            error = np.sum((energies - energies_true)**2)
+            if error < best_error:
+                best_error = error
+                best_params = (D, a, re)
+D_best, a_best, re_best = best_params
 energies_best = morse(distances, *best_params)
 
 print("Best Morse parameters from grid search:")
@@ -62,4 +76,5 @@ ax2.set_title("Best Grid Search Fit vs True")
 ax2.legend()
 
 plt.tight_layout()
+plt.savefig('morse_fitting_bruteforce.png', dpi=300)
 plt.show()

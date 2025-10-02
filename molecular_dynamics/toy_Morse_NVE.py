@@ -70,6 +70,25 @@ def velocity_verlet(positions, velocities, box_size, D, a, r_e, dt, steps):
     
     
     '''
+    forces, potential_energy = compute_forces(positions, box_size, D, a, r_e)
+    for step in range(steps):
+        # Update positions
+        positions = (positions + velocities * dt + 0.5 * forces * dt**2) % box_size
+        
+        # Compute new forces
+        new_forces, potential_energy = compute_forces(positions, box_size, D, a, r_e)
+        
+        # Update velocities
+        velocities += 0.5 * (forces + new_forces) * dt
+        
+        # Store trajectory and energies
+        traj[step] = positions
+        kinetic_energy = 0.5 * np.sum(velocities**2)
+        total_energy = kinetic_energy + potential_energy
+        energies[step] = [kinetic_energy, potential_energy, total_energy]
+        
+        # Prepare for next iteration
+        forces = new_forces
 
     return traj, energies
 
@@ -179,7 +198,8 @@ def update(frame):
 
 anim = FuncAnimation(fig, update, frames=range(0, steps, 10),
                      interval=30, blit=True)
-plt.show()
+# plt.savefig('al_dimers_dynamic_bonds.png', dpi=300)
+# plt.show()
 
 # To save:
-# anim.save("al_dimers_dynamic_bonds.mp4", writer="ffmpeg", fps=30)
+anim.save("al_dimers_dynamic_bonds.mp4", writer="imagemagick", fps=30)
