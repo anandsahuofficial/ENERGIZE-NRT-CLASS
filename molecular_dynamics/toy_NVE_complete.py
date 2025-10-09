@@ -83,7 +83,7 @@ def velocity_verlet(positions, velocities, box_size, D, a, r_e, dt, steps):
 # ---------------- Simulation parameters ----------------
 params = {"D": 2.40, "a": 1.0, "r_e": 2.7}
 #params = {"D": 1.0, "a": 1.0, "r_e": 1.0}
-num_dimers = 150
+num_dimers = 10
 N = num_dimers*2
 box_size = 20.0
 dt = 0.01
