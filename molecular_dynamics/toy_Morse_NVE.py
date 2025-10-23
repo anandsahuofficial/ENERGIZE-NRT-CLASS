@@ -92,6 +92,45 @@ def velocity_verlet(positions, velocities, box_size, D, a, r_e, dt, steps):
 
     return traj, energies
 
+def velocity_verlet_berendsen_thermostat(positions, velocities, box_size, D, a, r_e, dt, steps, target_temperature):
+
+    N = len(positions)
+    traj = np.zeros((steps, N, 2))
+    energies = np.zeros((steps, 3))
+    tau = 0.1  # relaxation time for thermostat
+
+    forces, potential_energy = compute_forces(positions, box_size, D, a, r_e)
+    for step in range(steps):
+        # Update positions
+        positions = (positions + velocities * dt + 0.5 * forces * dt**2) % box_size
+        
+        # Compute new forces
+        new_forces, potential_energy = compute_forces(positions, box_size, D, a, r_e)
+        
+        # Update velocities
+        velocities += 0.5 * (forces + new_forces) * dt
+        
+        # Apply Berendsen thermostat
+        kinetic_energy = 0.5 * np.sum(velocities**2)
+        current_temperature = (2.0 * kinetic_energy) / (2 * N)  # kB=1
+        lambda_factor = np.sqrt(1 + (dt / tau) * (target_temperature / current_temperature - 1))
+        velocities *= lambda_factor
+        
+        # Store trajectory and energies
+        traj[step] = positions
+        kinetic_energy = 0.5 * np.sum(velocities**2)
+        total_energy = kinetic_energy + potential_energy
+        energies[step] = [kinetic_energy, potential_energy, total_energy]
+        
+        # Prepare for next iteration
+        forces = new_forces
+
+    return traj, energies, current_temperature
+
+    
+
+
+
 # ---------------- Simulation parameters ----------------
 params = {"D": 1.0, "a": 1.0, "r_e": 1.0} #add your optimized potential parameters here
 num_dimers = 4
@@ -102,9 +141,18 @@ steps = 20000
 
 # Initialize positions and velocities
 positions, velocities = initialize_dimers(num_dimers, box_size, r0=params["r_e"])
-traj, energies = velocity_verlet(positions, velocities, box_size,
-                                 params["D"], params["a"], params["r_e"],
-                                 dt, steps)
+# traj, energies = velocity_verlet(positions, velocities, box_size,
+#                                  params["D"], params["a"], params["r_e"],
+#                                  dt, steps)
+
+# Run NVT with Berendsen thermostat
+target_temperature = 0.5
+traj, energies, final_temp = velocity_verlet_berendsen_thermostat(
+    positions, velocities, box_size,
+    params["D"], params["a"], params["r_e"],
+    dt, steps, target_temperature)
+print(f"Final temperature: {final_temp:.3f}")
+
 
 # ---------------- Energy plot ----------------
 plt.figure(figsize=(6,4))
@@ -116,6 +164,7 @@ plt.xlabel("Step")
 plt.ylabel("Energy (eV)")
 plt.legend()
 plt.tight_layout()
+plt.savefig(f"energy_temperature_berendsen_corrected_{target_temperature}.png", dpi=300)
 plt.show()
 
 # ---------------- Animation ----------------
@@ -198,8 +247,12 @@ def update(frame):
 
 anim = FuncAnimation(fig, update, frames=range(0, steps, 10),
                      interval=30, blit=True)
+
+print("Avg Bond lengths:", np.mean([np.linalg.norm(minimum_image(traj[-1,i]-traj[-1,j], box_size))
+                                     for (i,j) in bond_list]))
+
 # plt.savefig('al_dimers_dynamic_bonds.png', dpi=300)
 # plt.show()
 
 # To save:
-anim.save("al_dimers_dynamic_bonds.mp4", writer="imagemagick", fps=30)
+# anim.save("al_dimers_dynamic_bonds.mp4", writer="imagemagick", fps=30)

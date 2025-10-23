@@ -147,6 +147,7 @@ def main():
         ax.set_ylim(-2, 2)
 
     plt.tight_layout()
+    plt.savefig("VV_diagram.png", dpi=300)
     plt.show()
 
 

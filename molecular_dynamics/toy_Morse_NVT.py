@@ -183,6 +183,7 @@ ax2.set_title("Temperature vs Time")
 ax2.legend()
 
 plt.tight_layout()
+plt.savefig("energy_temperature_berendsen_corrected.png", dpi=300)
 plt.show()
 
 # ---------------- Animation with dynamic bonds (same as before) ----------------
