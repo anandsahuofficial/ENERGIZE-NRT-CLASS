@@ -15,7 +15,7 @@ def morse(r, D, a, r_e):
     return D * (1 - np.exp(-a * (r - r_e)))**2 - D
 
 # --- Fit Morse parameters ---
-p0 = [1.0, 1.0, 1.0]
+p0 = [2.0, 1.0, 1.0]
 params, cov = curve_fit(morse, distances, energies_true, p0=p0)
 D_fit, a_fit, re_fit = params
 
