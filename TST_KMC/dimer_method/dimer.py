@@ -42,6 +42,8 @@ def rotate_dimer(N, tau, angle_step=0.1):
     TO-DO
     
     '''
+    N_new = N + angle_step * normalize(tau)
+
 
 
     return normalize(N_new)
@@ -55,6 +57,8 @@ def dimer_translation_step(R, F, N, step_size=0.01):
     TO-DO
 
     '''
+    F_eff = F - 2 * np.dot(F, N) * N
+    R_new = R + step_size * normalize(F_eff)
 
 
     return R_new
@@ -66,6 +70,16 @@ def dimer_curvature(atoms, R, N, dimer_sep):
     TO-DO
 
     '''
+    R_plus = R + (dimer_sep / 2) * N
+    R_minus = R - (dimer_sep / 2) * N
+    atoms.set_positions(R_plus.reshape((-1, 3)))
+    f_plus = atoms.get_forces().flatten()
+
+    atoms.set_positions(R_minus.reshape((-1, 3)))
+    f_minus = atoms.get_forces().flatten()
+    
+    delta_f = f_plus - f_minus
+    curvature = np.dot(delta_f, N) / dimer_sep
 
     return curvature
 
@@ -109,7 +123,7 @@ def create_al_slab_and_adatom_bridge():
     slab += Atom('Al', position=adatom_pos)
 
     # Use EAM calculator, must exist on your system!
-    calc = EAM(potential=r'C:\Users\jc112358\venv\Lib\site-packages\ENERGIZE-NRT-CLASS\TST_KMC\dimer_method\Al_zhou.eam.alloy')
+    calc = EAM(potential=r'Al_zhou.eam.alloy')
     slab.set_calculator(calc)
 
     return slab
@@ -133,7 +147,7 @@ def create_al_slab_and_adatom():
     slab += Atom('Al', position=adatom_pos)
 
     # Use proper EAM potential
-    calc = EAM(potential=r'C:\Users\jc112358\venv\Lib\site-packages\ENERGIZE-NRT-CLASS\TST_KMC\dimer_method\Al_zhou.eam.alloy')
+    calc = EAM(potential=r'Al_zhou.eam.alloy')
     slab.calc = calc
     return slab
 
@@ -209,6 +223,7 @@ def plot_energy_contour_with_path_centered(slab, positions, energies):
 
     plt.legend()
     plt.tight_layout()
+    plt.savefig("energy_contour_with_path_centered.png", dpi=300)
     plt.show()
 
 
