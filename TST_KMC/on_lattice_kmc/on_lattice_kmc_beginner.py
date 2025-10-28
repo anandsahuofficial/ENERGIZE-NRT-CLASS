@@ -56,17 +56,17 @@ def attempt_vacancy_change(x, y):
     current_state = lattice[x, y]
 
     # 2. Retrieve local vacancy formation energy at site (energy cost/gain for creating/removing vacancy)
-    E_form =
+    E_form = #TO-DO
 
     # 3. Compute energy change (ΔE) associated with flipping this site:
     #    If currently atom (1), trying to form vacancy costs E_form (positive ΔE)
     #    If currently vacancy (0), trying to fill vacancy gains energy (-E_form, negative ΔE)
     if current_state == 1:
         # Attempt vacancy creation -> energy increases by E_form
-        delta_E =
+        delta_E = #TO-DO
     else:
         # Attempt filling vacancy -> energy decreases by E_form
-        delta_E = 
+        delta_E = #TO-DO
 
     # 4. Determine if proposed move is accepted using Metropolis criterion:
     #    - If ΔE ≤ 0: accept move unconditionally (energy lowered or unchanged)
@@ -74,13 +74,13 @@ def attempt_vacancy_change(x, y):
     if delta_E <= 0:
         accept = True
     else:
-        p_accept =
-        accept =
+        p_accept = #TO-DO
+        accept = #TO-DO
 
     # 5. If accepted, flip occupancy state:
     #    Change atom to vacancy or vacancy to atom by toggling 1 <-> 0
     if accept:
-        lattice[x, y] =
+        lattice[x, y] = #TO-DO
 
     # 6. Return whether the move was accepted for tracking or debugging
     return accept
@@ -97,8 +97,8 @@ def perform_kmc_steps(n):
 
     for _ in range(n):
         # 1. Choose random voxel coordinates uniformly over lattice
-        x =
-        y =
+        x = #TO-DO
+        y = #TO-DO
 
         # 2. Attempt vacancy flip move at that site
         attempt_vacancy_change(x, y)
