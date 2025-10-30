@@ -90,28 +90,28 @@ def attempt_vacancy_formation():
         return False, [], []
 
     # Randomly select one atom index from current atoms
-
+    # TO-DO
     # Get vacancy formation energy associated with this atom (energy cost to remove it)
-
+    # TO-DO
     # Decide whether to accept the move with Metropolis acceptance criterion
-
+    # TO-DO
     # Prepare empty lists to record formed atom and vacancy indices (for visualization/event tracking)
     formed_sites_atom_idx = []    # vacancy formation removes an atom, so no new atom
     formed_sites_vac_idx = []     # will hold index of newly created vacancy if accepted
 
     if accepted:
         # The atom at idx is removed, creating a vacancy at that position
-
+    # TO-DO
         # Get coordinates of atom being removed to add vacancy there
-
+    # TO-DO
         # Append vacancy coordinate to vacancies array (stack vertically)
-
+    # TO-DO
         # Remove atom from positions array by deleting its entry
-
+    # TO-DO
         # Update system arrays with atom removed
-
+    # TO-DO
         # Record index of new vacancy for tracking: it's the last vacancy appended
-
+    # TO-DO
     # Return whether move accepted, empty atom list since no new atom formed, and vacancy indices formed
     return accepted, [], formed_sites_vac_idx
 
@@ -126,26 +126,26 @@ def attempt_vacancy_annihilation():
         return False, [], []
 
     # Randomly select vacancy index to fill
-
+    # TO-DO
     # Get vacancy position coordinate to add atom there
-
+    # TO-DO
     # Differs from formation: energy gain from removing vacancy (assumed negative formation energy)
     # We approximate energy difference by negative mean formation energy of atoms as heuristic
-
+    # TO-DO
     # Determine acceptance probability by Metropolis criterion
-
+    # TO-DO
     # Lists for tracking newly formed atoms and vacancies for visualization/events
-
+    # TO-DO
     if accepted:
         # Add atom coordinate to positions array at vacancy location
-
+    # TO-DO
         # Generate new random energy parameters for this added atom
-
+    # TO-DO
 
         # Remove vacancy from vacancies array
-
+    # TO-DO
         # Track the newly formed atom index as the last atom appended
-
+    # TO-DO
     # Return move acceptance, list of new atoms added, and empty vacancy list (vacancy removed)
     return accepted, formed_sites_atom_idx, []
 
@@ -167,35 +167,35 @@ def attempt_vacancy_diffusion():
         return False, [], []
 
     # Randomly select a vacancy index
-
+    # TO-DO
     # Vacancy coordinate selected
-
+    # TO-DO
     # Build spatial KDTree for atom positions to quickly find neighbors
-
+    # TO-DO
     # Query all atom indices within neighbor_cutoff distance of vacancy position
-
+    # TO-DO
     # If no atoms near vacancy, diffusion hop impossible, reject
     if len(nearby_atom_indices) == 0:
         return False, [], []
 
     # Choose one random neighbor atom index among atoms near vacancy
-
+    # TO-DO
     # Position of selected atom
-
+    # TO-DO
     # Diffusion barrier energy associated with chosen atom (activation energy for hop)
-
+    # TO-DO
     # Apply Metropolis acceptance for diffusion attempt based on barrier
-
+    # TO-DO
     if accepted:
         # Swap positions: atom moves into vacancy position
         # Vacancy takes atom’s old coordinate
-
+        # TO-DO
         # Update vacancy coordinate to old atom position
-
+        # TO-DO
         # Update atom coordinate to vacancy position
-
+        # TO-DO
         # Increase cumulative diffusion event counter for bookkeeping
-
+        # TO-DO
         # Return that diffusion accepted, with involved atom and vacancy indices for tracking/highlighting
         return True, [a_idx], [v_idx]
     else:
