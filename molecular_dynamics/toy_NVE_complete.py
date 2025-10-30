@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 # ---------------- Morse potential ----------------
 def morse_potential(r, D, a, r_e):
@@ -187,7 +188,13 @@ def update(frame):
 
 anim = FuncAnimation(fig, update, frames=range(0, steps, 10),
                      interval=30, blit=True)
-plt.show()
+# plt.show()
 
 # To save:
 # anim.save("al_dimers_dynamic_bonds.mp4", writer="ffmpeg", fps=30)
+
+# anim.save('vacancy_kmc_separate.mp4', writer='ffmpeg', fps=20)
+writer = PillowWriter(fps=20)
+anim.save('al_dimers_dynamic_bonds.gif', writer=writer)
+
+plt.close()
