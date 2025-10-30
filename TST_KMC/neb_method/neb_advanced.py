@@ -8,7 +8,9 @@ from ase.optimize import BFGS
 
 # --- Setup slab and EMT potential (replace with DFT calculator if available) ---
 slab = fcc111('Al', size=(3, 3, 4), vacuum=10.0)
-calc = EAM(potential=r'C:\Users\jc112358\venv\Lib\site-packages\ENERGIZE-NRT-CLASS\TST_KMC\dimer_method\Al_zhou.eam.alloy')
+
+AlloyPath=r"Al_zhou.eam.alloy"
+calc = EAM(potential=AlloyPath)
 slab.set_calculator(calc)
 
 # --- Identify surface atoms to define fcc hollow, adjacent hollow, bridge sites ---
@@ -81,6 +83,27 @@ def get_tangent(prev, curr, next_):
     TO-DO
 
     '''
+    dR_forward = next_[-1].position - curr[-1].position
+    dR_backward = curr[-1].position - prev[-1].position
+    tangent = dR_forward - dR_backward
+    norm = np.linalg.norm(tangent)
+
+    # Handle degenerate case where tangent length is zero (avoid division by zero)
+    if norm < 1e-8:
+        # Prefer forward or backward displacement if available
+        nf = np.linalg.norm(dR_forward)
+        nb = np.linalg.norm(dR_backward)
+        if nf > 1e-8:
+            tangent = dR_forward
+            norm = nf
+        elif nb > 1e-8:
+            tangent = dR_backward
+            norm = nb
+        else:
+            # As a last resort, pick an arbitrary unit vector to avoid NaNs
+            tangent = np.array([1.0, 0.0, 0.0])
+            norm = 1.0
+
     return tangent / norm
 
 # --- Calculate NEB forces ---
@@ -90,14 +113,60 @@ def calc_neb_forces(images):
     TO-DO
 
     '''
+    neb_forces = []
+    energies = []
+
+    for i in range(len(images)):
+        img = images[i]
+        # Defensive checks: ensure atom positions are finite before calling ASE
+        positions = img.get_positions()
+        if not np.isfinite(positions).all():
+            bad_idx = np.argwhere(~np.isfinite(positions))
+            raise ValueError(
+                f"Non-finite positions found in image {i} at atom indices (row,dim): {bad_idx.tolist()}.\n"
+                f"Positions:\n{positions}"
+            )
+
+        try:
+            f = img.get_forces()[-1]  # Force on adatom
+            e = img.get_potential_energy()
+        except Exception as exc:
+            # Re-raise with context to help debugging
+            raise RuntimeError(f"Error evaluating forces/energy for image {i}: {exc}") from exc
+        energies.append(e)
+
+        if i == 0 or i == len(images) - 1:
+            neb_forces.append(f)
+            continue
+
+        prev_img = images[i - 1]
+        next_img = images[i + 1]
+        tangent = get_tangent(prev_img, img, next_img)
+
+        f_parallel = np.dot(f, tangent) * tangent
+        f_perpendicular = f - f_parallel
+
+        dR_forward = next_img[-1].position - img[-1].position
+        dR_backward = img[-1].position - prev_img[-1].position
+        spring_force = k_spring * (np.linalg.norm(dR_forward) - np.linalg.norm(dR_backward)) * tangent
+
+        neb_f = f_perpendicular + spring_force
+        neb_forces.append(neb_f)
     return neb_forces, energies
 
 # --- Update images with NEB forces ---
 def update_images(images, neb_forces, step_size=0.1):
     for i in range(1, len(images) - 1):
-        pos = images[i][-1].position
-        pos += step_size * neb_forces[i]
-        images[i][-1].position = pos
+        old_pos = images[i][-1].position.copy()
+        new_pos = old_pos + step_size * neb_forces[i]
+
+        # Prevent writing non-finite positions back into the images
+        if not np.isfinite(new_pos).all():
+            print(f"Warning: computed non-finite new position for image {i}; skipping update.\n"
+                  f"Old pos: {old_pos}\nComputed new pos: {new_pos}\nForce: {neb_forces[i]}")
+            continue
+
+        images[i][-1].position = new_pos
 
 # --- Run NEB optimization ---
 print("Starting NEB optimization...")
@@ -166,4 +235,5 @@ plt.title('Relative Energy Profile Along Path')
 plt.legend()
 
 plt.tight_layout()
+plt.savefig("neb_energy_profile_and_contour.png", dpi=300)
 plt.show()

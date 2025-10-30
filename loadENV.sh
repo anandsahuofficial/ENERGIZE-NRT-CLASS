@@ -1,2 +1,1 @@
-module load miniconda
-conda activate  ME_508
+module load miniconda; conda activate  ME_508
