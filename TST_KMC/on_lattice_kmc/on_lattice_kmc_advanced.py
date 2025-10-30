@@ -1,9 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation, PillowWriter
+
 
 # Parameters
-L = 100             # lattice size
+L = 200             # lattice size
 N_steps = 5000      # total KMC steps
 kT = 0.025         # thermal energy (eV) - increase temperature
 steps_per_frame = 50
@@ -34,7 +36,19 @@ def attempt_vacancy_change(x, y):
 
    '''
 
-    return accept
+   accept = False
+   if lattice[x, y] == 1:  # If site is occupied
+        delta_E = get_vacancy_energy(x, y)
+        if delta_E <= 0 or np.random.rand() < np.exp(-delta_E / kT):
+            lattice[x, y] = 0  # Create vacancy
+            accept = True 
+        else:  # If site is vacant
+            delta_E = -get_vacancy_energy(x, y)
+            if delta_E <= 0 or np.random.rand() < np.exp(-delta_E / kT):
+                lattice[x, y] = 1  # Fill vacancy
+                accept = True
+
+   return accept
 
 def perform_kmc_steps(n):
     for _ in range(n):
@@ -43,6 +57,16 @@ def perform_kmc_steps(n):
         TO-DO
         
         '''
+        x = np.random.randint(0, L)
+        y = np.random.randint(0, L)
+        attempt_vacancy_change(x, y)
+# ==== KMC simulation and snapshot saving ====
+        # if _ % steps_per_frame == 0:
+        #     vac_count = np.sum(lattice == 0)
+        #     vacancy_counts.append(vac_count)
+        #     # Make a copy of lattice for animation snapshot
+        #     lattice_snapshots.append(lattice.copy())
+
 
 # ==== Perform full KMC simulation first and save snapshots ====
 
@@ -59,7 +83,7 @@ print("KMC simulation done. Total frames:", len(lattice_snapshots))
 # ==== Animate saved snapshots ====
 
 fig, ax = plt.subplots(figsize=(6,6))
-cmap = plt.cm.get_cmap('Greys_r', 2)  # Vacancy=white, atom=black
+cmap = plt.colormaps.get_cmap('Greys_r')  # Vacancy=white, atom=black
 im = ax.imshow(lattice_snapshots[0], cmap=cmap, vmin=0, vmax=1)
 ax.axis('off')
 
@@ -70,8 +94,10 @@ def update(frame):
 
 anim = animation.FuncAnimation(fig, update, frames=n_frames, blit=True, interval=50)
 
-#anim.save('vacancy_kmc_separate.mp4', writer='ffmpeg', fps=20)
-#plt.close()
+# anim.save('vacancy_kmc_separate.mp4', writer='ffmpeg', fps=20)
+writer = PillowWriter(fps=20)
+anim.save('vacancy_kmc_separate.gif', writer=writer)
+plt.close()
 
 # ==== Plot vacancy counts ====
 
