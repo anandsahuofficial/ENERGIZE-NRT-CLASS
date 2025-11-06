@@ -3,9 +3,10 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from scipy.spatial import KDTree
 import matplotlib.patches as mpatches
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 # ------- Parameters -------
-N_atoms_initial = 2500      # initial number of atoms (approx 50x50)
+N_atoms_initial = 2500     # initial number of atoms (approx 50x50)
 Lx, Ly = 20.0, 20.0        # simulation box size in Angstroms (arbitrary units)
 kT = 0.05                  # thermal energy in eV
 p_formation = 0.5          # Probability of vacancy formation/annihilation event per step
@@ -20,6 +21,51 @@ diffusion_energy_max = 0.05
 
 # Distance cutoff for neighbors (Angstrom)
 neighbor_cutoff = 1.5
+
+
+###### Parameters for Ni ########
+# DOI: https://doi.org/10.1103/PhysRevB.97.214106
+# DOI: https://doi.org/10.1103/PhysRevB.104.104406
+# Ab initio-based modeling of radiation effects in the nickel-iron-chromium system
+# https://www.researchgate.net/publication/252369412_Ab_initio-based_modeling_of_radiation_effects_in_the_nickel-iron-chromium_system#fullTextFileContent
+# https://doi.org/10.1063/1.4861380
+
+N_atoms_initial = 2500     # initial number of atoms (approx 50x50)
+Lx, Ly = 20.0, 20.0        # simulation box size in Angstroms (arbitrary units)
+kT = 0.025                  # thermal energy in eV
+p_formation = 0.5          # Probability of vacancy formation/annihilation event per step
+formation_energy_min = 1.4 
+formation_energy_max = 1.8
+diffusion_energy_min = 0.35
+diffusion_energy_max = 0.98
+neighbor_cutoff = 1.5
+
+def true_Cv(formation_energy_min, formation_energy_max, kT):
+    """Calculate theoretical vacancy concentration for Ni at given kT"""
+    # Using average vacancy formation energy for Ni from literature
+    E_f_avg = (formation_energy_min + formation_energy_max) / 2  # eV
+    Cv = np.exp(-E_f_avg / kT)
+    return Cv
+
+def true_diffusion_rate(d,Cv):
+    """Calculate theoretical diffusion rate for Ni at given kT"""
+    # Using average diffusion activation energy for Ni from literature
+    D =  (1/4) * d**2 * Cv
+    return D
+
+def approximate_interatomic_distance(N_atoms, Lx, Ly):
+    """Approximate interatomic distance based on area per atom in 2D"""
+    area_per_atom = (Lx * Ly) / N_atoms
+    d = np.sqrt(area_per_atom)
+    return d
+
+def approximate_vacancy_concentration(num_vacancies, num_sites):
+    Cv = num_vacancies / num_sites
+    return Cv
+
+def approximate_diffusion_coefficient(N_events, d, N_vacancy, delta_t):
+    D = (1/4) * d**2 * (N_events / (N_vacancy * delta_t))
+    return D
 
 # ---- Generate initial 2D FCC (111)-like lattice coordinates (approximate triangular lattice) ----
 def create_fcc111_lattice(n_atoms, Lx, Ly):
@@ -93,7 +139,8 @@ def attempt_vacancy_formation():
     idx = np.random.randint(len(positions))
 
     # Get vacancy formation energy associated with this atom (energy cost to remove it)
-    delta_E = #TO-DO
+    # delta_E = #TO-DO
+    delta_E = formation_energies[idx]
 
     # Decide whether to accept the move with Metropolis acceptance criterion
     accepted = metropolis_acceptation(delta_E)
@@ -148,7 +195,8 @@ def attempt_vacancy_annihilation():
     delta_E = -np.mean(formation_energies)
 
     # Determine acceptance probability by Metropolis criterion
-    accepted = #TO-DO
+    # accepted = #TO-DO
+    accepted = metropolis_acceptation(delta_E)
 
     # Lists for tracking newly formed atoms and vacancies for visualization/events
     formed_sites_atom_idx = []
@@ -192,7 +240,8 @@ def attempt_vacancy_diffusion():
         return False, [], []
 
     # Randomly select a vacancy index
-    v_idx = #TO-DO
+    # v_idx = #TO-DO
+    v_idx= np.random.randint(len(vacancies))
 
     # Vacancy coordinate selected
     vac_pos = vacancies[v_idx]
@@ -208,16 +257,20 @@ def attempt_vacancy_diffusion():
         return False, [], []
 
     # Choose one random neighbor atom index among atoms near vacancy
-    a_idx = #TO-DO
+    # a_idx = #TO-DO
+    a_idx = np.random.choice(nearby_atom_indices)
 
     # Position of selected atom
-    atom_pos = #TO-DO
+    # atom_pos = #TO-DO
+    atom_pos= positions[a_idx]
 
     # Diffusion barrier energy associated with chosen atom (activation energy for hop)
-    delta_E = #TO-DO
+    # delta_E = #TO-DO
+    delta_E = diffusion_energies[a_idx]
 
     # Apply Metropolis acceptance for diffusion attempt based on barrier
-    accepted = #TO-DO
+    # accepted = #TO-DO
+    accepted = metropolis_acceptation(delta_E)
 
     if accepted:
         # Swap positions: atom moves into vacancy position
@@ -325,6 +378,12 @@ for frame in range(N_frames):
         print(f"Frame {frame+1}/{N_frames}: Vacancies = {len(vacancies)}, Diffusions = {cumulative_diffusions}")
 
 # ------- Animation -------
+   # Define the progress callback
+    def my_progress_callback(frame, total_frames):
+        if total_frames is not None:
+            print(f"Saving frame {frame} of {total_frames} ({frame/total_frames:.1%})")
+        else:
+            print(f"Saving frame {frame}")
 
 fig, ax = plt.subplots(figsize=(6,6))
 
@@ -375,6 +434,11 @@ anim = animation.FuncAnimation(fig, animate, frames=N_frames, interval=200)
 
 #anim.save("off_lattice_vacancy_kmc.mp4", writer='ffmpeg', fps=5)
 #plt.close()
+
+writer = PillowWriter(fps=20)
+anim.save('off_lattice_vacancy_kmc.gif', writer=writer, progress_callback=my_progress_callback)
+plt.close()
+
 
 # ------- Plot vacancy and diffusion counts -------
 
