@@ -14,7 +14,9 @@ N = 3
 
 # Model parameters:
 epsilon = 1   # Interface thickness parameter (controls width of interface)
-M = 1         # Mobility parameter (controls interface velocity)
+M = 5   0         # Mobility parameter (controls interface velocity)
+
+
 
 # Initialize the phase field array with zeros
 # Shape: (N phases, nx, ny)
@@ -34,7 +36,8 @@ phi[0] = circle(30, 50, 10)  # bubble 1 centered at (30,50)
 phi[1] = circle(70, 50, 10)  # bubble 2 centered at (70,50)
 # Liquid phase occupies the complementary region (sum of bubbles subtracted from 1)
 
-phi[2] = # TO-DO
+# phi[2] = # TO-DO
+phi[2] = 1 - (phi[0] + phi[1])
 
 # Ensure values are between 0 and 1 and sum to unity at each grid point
 phi = np.clip(phi, 0, 1)
@@ -44,7 +47,9 @@ phi /= np.sum(phi, axis=0)  # normalize so sum of phases == 1
 def laplacian(f):
     # Use numpy roll to compute finite difference Laplacian with neighbors
 
-    l = # TO-DO
+    # l = # TO-DO
+    l = (np.roll(f, 1, axis=0) + np.roll(f, -1, axis=0) +
+         np.roll(f, 1, axis=1) + np.roll(f, -1, axis=1) - 4 * f) / (dx ** 2)
 
     
     return l
@@ -61,13 +66,15 @@ for step in range(nsteps):
         # Compute derivative of the double-well polynomial potential:
         # This term drives the phase field towards values 0 or 1, promoting phase separation
 
-        df = # TO-DO
+        # df = # TO-DO
+        df = 2 * phi[i] * (1 - phi[i]) * (1 - 2 * phi[i])
 
         # Allen-Cahn equation update:
         # The time derivative of phi is driven by mobility * variation of free energy functional
         # Free energy derivative has curvature (laplacian) and double-well potential contributions
 
-        phi[i] += # TO-DO
+        # phi[i] += # TO-DO
+        phi[i] += dt * M * (epsilon ** 2 * lap - df)
 
     # After updating all phases, enforce the physical constraints:
     # Clip values to [0,1] range since phase fields are fractions
@@ -97,3 +104,5 @@ cbar1.set_label('Gas phase fraction', rotation=270, labelpad=15)
 plt.tight_layout()
 # Show the plot
 plt.show()
+plt.savefig(f"pf_demo_beginner_result_M{M}.png")
+plt.close()
